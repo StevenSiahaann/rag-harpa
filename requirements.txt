@@ -22,5 +22,3 @@ gunicorn
 python-docx
 langchain-community
 playwright
-pdfkit
-beautifulsoup4
