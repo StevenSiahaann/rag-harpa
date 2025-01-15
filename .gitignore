@@ -1,0 +1,60 @@
+.env
+.vercel
+# Virtual environment
+harpa-env/
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+util/__pycache__/*
+**/__pycache__/*
+*.py[cod]
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.tox/
+.cache/
+pytest_cache/
+
+# Editor backups and configuration files
+*.swp
+*.swo
+*.bak
+*.tmp
+*.~backup
+*.idea/
+*.vscode/
+*.DS_Store
