@@ -1,4 +1,4 @@
-torch==2.5.1+cpu
+torch==2.4.1+cpu
 torchvision==0.19.1+cpu
 -f https://download.pytorch.org/whl/cpu
 transformers
@@ -22,3 +22,5 @@ gunicorn
 python-docx
 langchain-community
 playwright
+pdfkit
+beautifulsoup4

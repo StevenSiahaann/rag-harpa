@@ -34,9 +34,8 @@ def get_page(urls):
 
     bs_transformer = BeautifulSoupTransformer()
     docs_transformed = bs_transformer.transform_documents(
-        html, tags_to_extract=["p"], remove_unwanted_tags=["a"]
+        html, tags_to_extract=None, remove_unwanted_tags=["a", "script", "style"]
     )
-
     return docs_transformed
 
 def extract_text_from_pdf(pdf_path):
@@ -76,9 +75,7 @@ def extract_text_from_docx(file_path):
 def preprocess_image(image):
     """Preprocess the image for better OCR accuracy: grayscale, contrast, and resize."""
     gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
-    # Resize to improve OCR accuracy if image is too small
     resized = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    # Increase contrast
     contrast = cv2.convertScaleAbs(resized, alpha=2.0, beta=0)
     return contrast
 
