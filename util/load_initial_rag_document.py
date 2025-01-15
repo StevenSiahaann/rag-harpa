@@ -41,7 +41,6 @@ def load_initial_knowledge(collection):
                     documents=document_chunks,
                     metadatas=metadatas,
                 )
-                print(f"Loaded initial knowledge: {doc_name}")
             else:
                 print(f"Failed to extract text from {item}")
 

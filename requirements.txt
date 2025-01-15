@@ -1,0 +1,24 @@
+torch==2.5.1+cpu
+torchvision==0.19.1+cpu
+-f https://download.pytorch.org/whl/cpu
+transformers
+sentence-transformers
+Flask
+flask-cors
+google-generativeai
+chromadb
+python-dotenv
+pytesseract
+pdfplumber
+python-pptx
+opencv-python-headless
+Pillow
+pdf2image
+playwright
+wkhtmltopdf
+PyJWT
+logging
+gunicorn
+python-docx
+langchain-community
+playwright

@@ -16,7 +16,5 @@ Your response must be informative, concise and short provide as much relevant de
     #history_prompt = "\n".join([f"User: {item['query']}\nBot: {item['response']}" for item in history])
     history_prompt= "Here is all the history of our previous interactions you have:\n" + "\n".join([f"User: {item['query']}\nBot: {item['response']}" for item in history])
     history_prompt = clean_text(history_prompt)
-    print()
     #print("HISTORY : ", f"{history_prompt}")
-    print("COMBINED PROMPT : ", f"{base_prompt} \n HISTORY: {history_prompt} \n USER PROMPT: {user_prompt}")
     return f"{base_prompt} {history_prompt} {user_prompt}"

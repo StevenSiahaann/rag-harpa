@@ -47,11 +47,6 @@ def extract_text_from_pdf(pdf_path):
             page_text = page.extract_text(layout=True)  # Preserve layout
             if page_text:  
                 text += page_text + "\n"
-                images = convert_from_path(pdf_path)
-                for image in images:
-                    ocr_text = pytesseract.image_to_string(image)
-                    text += ocr_text + "\n"
-    print("EXTRACTED TEXT: \n", clean_text(text))
     return clean_text(text)
 
 def extract_text_from_ppt(ppt_path):
@@ -70,14 +65,12 @@ def extract_text_from_ppt(ppt_path):
                 for sub_shape in shape.shapes:
                     if hasattr(sub_shape, "text"):
                         text += sub_shape.text + "\n"
-    print("EXTRACTED TEXT: \n", clean_text(text))
     return clean_text(text)
 
 def extract_text_from_docx(file_path):
     """Extract text from a .docx file."""
     doc = Document(file_path)
     text = '\n'.join([para.text for para in doc.paragraphs])
-    print("EXTRACTED TEXT: \n", clean_text(text))
     return clean_text(text)
 
 def preprocess_image(image):
@@ -92,9 +85,8 @@ def preprocess_image(image):
 def extract_text_from_image(image_path):
     """Extract text from an image using OCR with preprocessing."""
     image = Image.open(image_path)
-    preprocessed_image = preprocess_image(image)  # Apply preprocessing for better accuracy
-    text = pytesseract.image_to_string(preprocessed_image, config='--psm 6')  # Use custom OCR config for block text
-    print("EXTRACTED TEXT: \n", clean_text(text))
+    preprocessed_image = preprocess_image(image)
+    text = pytesseract.image_to_string(preprocessed_image, config='--psm 6')
     return clean_text(text)
 
 def extract_text_from_txt(file_path):
@@ -174,26 +166,20 @@ def search_json_for_keys(data, keys):
     """
     found = {}
 
-    # If the data is a string, attempt to parse it as JSON, and continue if valid
     if isinstance(data, str):
         try:
-            # Try to load the JSON string
             nested_data = json.loads(data)
-            # Recursively search in this parsed structure
             return search_json_for_keys(nested_data, keys)
         except json.JSONDecodeError:
             pass  # If it's not a valid JSON string, continue
 
-    # If the data is a dictionary, iterate over its items
     if isinstance(data, dict):
         for key, value in data.items():
             if key in keys:
                 found[key] = value  # Found the key, add it to the result
             elif isinstance(value, (dict, list, str)):
-                # Recursively search in nested structures, including strings that may contain JSON
                 found.update(search_json_for_keys(value, keys))
     
-    # If the data is a list, iterate over the items
     elif isinstance(data, list):
         for item in data:
             found.update(search_json_for_keys(item, keys))

@@ -16,20 +16,17 @@ from util.load_initial_rag_document import *
 from util.check_session import *
 import argparse
 from urllib.parse import urlparse
-import logging
 import torch
-logging.basicConfig(level=logging.DEBUG)
 
 from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
-base_url = os.getenv("BASE_URL")
+# base_url = os.getenv("BASE_URL")
 conversation_state = defaultdict(dict)
 chat_history = defaultdict(list)
 
 
-# Suppress specific warnings from Hugging Face transformers library
 warnings.filterwarnings("ignore", message="You are using the default legacy behaviour")
 warnings.filterwarnings("ignore", message="It will be set to `False` by default.")
 warnings.filterwarnings("ignore", message="`clean_up_tokenization_spaces` was not set")
@@ -53,16 +50,19 @@ os.environ["USER_AGENT"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-flan_tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-large", legacy=False)
-flan_model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-large")
+# flan_tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-large", legacy=False)
+# flan_model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-large")
 
 session_history: Dict[str, List[Dict[str, str]]] = {}
 embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-model = genai.GenerativeModel("gemini-1.5-flash")
-headers = {
-    "x-team": "steven"
-}
+model = genai.GenerativeModel("gemini-1.5-pro")
+# headers = {
+#     "x-team": "steven"
+# }
+def validate_document_format(filename):
+    valid_extensions = ('.pdf', '.ppt', '.docx', '.jpg', '.jpeg', '.png', '.txt', '.json', '.csv', '.pptx')
+    return filename.endswith(valid_extensions)
 def get_gemini_response(query: str, context: List[str], session_id: str, extract_data: bool = False,documentID: str = None) -> str:
     def rerank_results(context: List[str], query: str) -> List[str]:
         scores = embedding_model.encode([query], convert_to_tensor=True)
@@ -82,7 +82,6 @@ def get_gemini_response(query: str, context: List[str], session_id: str, extract
 @app.route('/v1/knowledge/', methods=['POST'])
 def upload_document():
     try:
-        logging.debug("Starting document upload process")
         authorization_header = request.headers.get('Authorization')
 
         if not authorization_header:
@@ -95,16 +94,18 @@ def upload_document():
 
         if "error" in result:
             return jsonify({"error": f"{result["error"]}"}), 401
-    
+
+        text = None
+        doc_name = None
         if request.args.get('type')=='file':
-            logging.debug("Processing file upload")
+            if 'file' not in request.files:
+                return jsonify({"error": "No document uploaded."}), 400
 
             document = request.files['file']
             doc_name = document.filename
-            if 'file' not in request.files:
-                return jsonify({"error": "No document uploaded."}), 400
-            if not doc_name.endswith(('.ppt', '.docx', '.jpg', '.jpeg', '.png', '.txt', '.json', '.csv','.txt','.pptx')):
-                return jsonify({"error": "Invalid document format. Only PDF, PPT, DOCX, and images are supported."}), 400    
+            if not validate_document_format(doc_name):
+                return jsonify({"error": "Invalid document format. Only PDF, PPT, DOCX, and images are supported."}), 400
+
             upload_path = os.path.join("uploads", doc_name)
             text = extract_text_from_file(upload_path)
             document.save(upload_path)
@@ -143,10 +144,10 @@ def upload_document():
                 for doc in documents:
                     f.write(doc.page_content + '\n')
             text = extract_text_from_file(upload_path)
+
+
         if not text:
             return jsonify({"error": "Failed to extract text from the document."}), 400
-        elif text == "JSON_DATA":
-            return jsonify({"Success": f"Action taken successfully.."}), 200
         document_id = "doc_" + os.urandom(6).hex()
         lines = text.splitlines()
         documents = [line for line in lines if line.strip()]
@@ -158,16 +159,6 @@ def upload_document():
         )
         return jsonify({"message": "Document uploaded and processed successfully.", "document_id": document_id}), 200
 
-            # document_id = f"doc_{os.urandom(6).hex()}"
-            # lines = text.splitlines()
-            # documents = [line for line in lines if line.strip()]
-            # metadatas = [{"document_id": document_id, "filename": doc_name, "line_number": i} for i, _ in enumerate(documents, 1)]
-            # collection.add(
-            #     ids=[f"{document_id}_{i}" for i in range(len(documents))],
-            #     documents=documents,
-            #     metadatas=metadatas
-            # )
-            # return jsonify({"message": "Knowledge uploaded successfully", "document_id": document_id}), 200
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
@@ -318,8 +309,9 @@ def main(collection_name: str = "documents_collection", persist_directory: str =
     except Exception as e:
         print(f"Collection '{collection_name}' not found. Creating a new collection.")
         collection = client.create_collection(name=collection_name, embedding_function=embedding_function)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
 
-    app.run(port=3000)
+    # app.run()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load documents into a Chroma collection")
