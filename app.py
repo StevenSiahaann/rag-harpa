@@ -17,7 +17,7 @@ from util.check_session import *
 import argparse
 from urllib.parse import urlparse
 import torch
-
+import requests
 from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -131,18 +131,22 @@ def upload_document():
             upload_path = pdf_path
             text = extract_text_from_file(upload_path)
         elif request.args.get('type') == 'curl':
-            curl_command = request.json.get('curl')
-            if not curl_command:
-                return jsonify({"error": "No curl command provided."}), 400
-            url = extract_url_from_curl(curl_command)
+            print("aaaa")
+            url = request.json.get('url')
+            print(url)
             if not url:
-                return jsonify({"error": "Invalid curl command or URL missing."}), 400
-            documents = get_page([url])
-            doc_name = f"curl_content_{os.urandom(6).hex()}.txt"
+                return jsonify({"error": "No url command provided."}), 400
+            headers = request.json.get('headers', {})
+            body = request.json.get('body', {})
+            response = requests.post(url, headers=headers, json=body)
+            response.raise_for_status()
+            documents = response.json()
+
+            doc_name = f"curl_content_{os.urandom(6).hex()}.json"
             upload_path = os.path.join(app.config['UPLOAD_FOLDER'], doc_name)
             with open(upload_path, 'w', encoding='utf-8') as f:
-                for doc in documents:
-                    f.write(doc.page_content + '\n')
+                f.write(str(documents))
+
             text = extract_text_from_file(upload_path)
 
 
@@ -161,9 +165,6 @@ def upload_document():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-
 
 
 @app.route('/v1/chat', methods=['POST'])
