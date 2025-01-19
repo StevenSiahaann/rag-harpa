@@ -20,5 +20,4 @@ python-docx
 langchain-community
 playwright
 pdfkit
-pysqlite3
 pysqlite3-binary
