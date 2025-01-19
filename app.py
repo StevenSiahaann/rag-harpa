@@ -35,7 +35,7 @@ persist_directory=os.getenv("PERSIST_DIRECTORY")
 GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 HUGGING_FACE_KEY = os.getenv("HUGGING_FACE_KEY")
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'app/uploads')
+UPLOAD_FOLDER = os.path.join(os.getcwd(), '/app/uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     print("Creating folder...")
     os.makedirs(UPLOAD_FOLDER)
@@ -121,7 +121,8 @@ def upload_document():
 
             safe_url = f"{domain}{path}"
             doc_name = f"url_content_{safe_url}_{os.urandom(6).hex()}.pdf"
-            pdf_path = os.path.join("uploads", doc_name)
+            # pdf_path = os.path.join("uploads", doc_name)
+            pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], doc_name)
 
             all_pages = "\n".join([doc.page_content for doc in documents])
 
