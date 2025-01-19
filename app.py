@@ -35,7 +35,7 @@ persist_directory=os.getenv("PERSIST_DIRECTORY")
 GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 HUGGING_FACE_KEY = os.getenv("HUGGING_FACE_KEY")
-UPLOAD_FOLDER = os.path.join(os.getcwd(), './app/uploads')
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'app/uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     print("Creating folder...")
     os.makedirs(UPLOAD_FOLDER)
