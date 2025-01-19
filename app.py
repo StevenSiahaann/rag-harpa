@@ -7,9 +7,9 @@ from collections import defaultdict
 from sentence_transformers import SentenceTransformer,util
 import google.generativeai as genai
 from typing import List, Dict
-__import__('pysqlite3')
+# __import__('pysqlite3')
 import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import chromadb
 from chromadb.utils import embedding_functions
 from util.prepare_document import *
@@ -32,6 +32,7 @@ chat_history = defaultdict(list)
 warnings.filterwarnings("ignore", message="You are using the default legacy behaviour")
 warnings.filterwarnings("ignore", message="It will be set to `False` by default.")
 warnings.filterwarnings("ignore", message="`clean_up_tokenization_spaces` was not set")
+persist_directory=os.getenv("PERSIST_DIRECTORY")
 
 GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
@@ -296,7 +297,7 @@ def list_documents():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-def main(collection_name: str = "documents_collection", persist_directory: str = ".") -> None:
+def main(collection_name: str = "documents_collection") -> None:
     global collection
 
     client = chromadb.PersistentClient(path=persist_directory)
@@ -315,7 +316,7 @@ def main(collection_name: str = "documents_collection", persist_directory: str =
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load documents into a Chroma collection")
-    parser.add_argument("--persist_directory", type=str, default="chroma_storage", help="Directory to store the Chroma collection")
+    # parser.add_argument("--persist_directory", type=str, default="chroma_storage", help="Directory to store the Chroma collection")
     parser.add_argument("--collection_name", type=str, default="documents_collection", help="Name of the Chroma collection")
     args = parser.parse_args()
-    main(collection_name=args.collection_name, persist_directory=args.persist_directory)
+    main(collection_name=args.collection_name)
