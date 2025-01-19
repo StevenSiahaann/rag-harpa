@@ -36,11 +36,11 @@ GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 HUGGING_FACE_KEY = os.getenv("HUGGING_FACE_KEY")
 UPLOAD_FOLDER = os.path.join(os.getcwd(), './app/uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    print("Creating folder...")
-    os.makedirs(UPLOAD_FOLDER)
-else:
-    print("Folder already exists.")
+# if not os.path.exists(UPLOAD_FOLDER):
+#     print("Creating folder...")
+#     os.makedirs(UPLOAD_FOLDER)
+# else:
+#     print("Folder already exists.")
 
 app = Flask(__name__)
 CORS(app)
@@ -107,7 +107,7 @@ def upload_document():
 
             upload_path = os.path.join("./app/uploads", doc_name)
             text = extract_text_from_file(upload_path)
-            document.save(upload_path)
+            # document.save(upload_path)
 
         elif(request.args.get('type')=='url'):
             if not request.json.get('url'):
