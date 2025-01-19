@@ -7,9 +7,7 @@ from collections import defaultdict
 from sentence_transformers import SentenceTransformer,util
 import google.generativeai as genai
 from typing import List, Dict
-# __import__('pysqlite3')
 import sys
-# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import chromadb
 from chromadb.utils import embedding_functions
 from util.prepare_document import *
@@ -37,7 +35,7 @@ persist_directory=os.getenv("PERSIST_DIRECTORY")
 GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 HUGGING_FACE_KEY = os.getenv("HUGGING_FACE_KEY")
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+UPLOAD_FOLDER = os.path.join(os.getcwd(), './app/uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     print("Creating folder...")
     os.makedirs(UPLOAD_FOLDER)
@@ -107,7 +105,7 @@ def upload_document():
             if not validate_document_format(doc_name):
                 return jsonify({"error": "Invalid document format. Only PDF, PPT, DOCX, and images are supported."}), 400
 
-            upload_path = os.path.join("uploads", doc_name)
+            upload_path = os.path.join("./app/uploads", doc_name)
             text = extract_text_from_file(upload_path)
             document.save(upload_path)
 
