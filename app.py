@@ -73,7 +73,7 @@ def get_gemini_response(query: str, context: List[str],intent, session_id: str, 
     else:
         ranked_context = rerank_results(context, query)
         used_context = ranked_context[:3]
-        prompt = build_combined_prompt(query, truncated_context, history)
+        prompt = build_combined_prompt(query, used_context, history)
     response = model.generate_content(prompt)
     response_text = response.text.strip().lower()
     session_history.setdefault(session_id, []).append({"query": query, "response": response_text,"context": used_context
