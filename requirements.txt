@@ -14,7 +14,6 @@ pdf2image
 playwright
 wkhtmltopdf
 PyJWT
-logging
 gunicorn
 python-docx
 langchain-community
@@ -22,3 +21,4 @@ playwright
 pdfkit
 pysqlite3-binary
 playwright==1.39.0
+beautifulsoup4
