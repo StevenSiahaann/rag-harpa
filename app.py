@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS 
+import uuid
+import logging
 import warnings
 import os
 import sys
@@ -17,7 +19,9 @@ from util.load_initial_rag_document import *
 from util.check_session import *
 from util.load_endpoint import *
 import argparse
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
+from datetime import date
+
 import requests
 from dotenv import load_dotenv
 
@@ -31,11 +35,10 @@ warnings.filterwarnings("ignore", message="You are using the default legacy beha
 warnings.filterwarnings("ignore", message="It will be set to `False` by default.")
 warnings.filterwarnings("ignore", message="`clean_up_tokenization_spaces` was not set")
 persist_directory=os.getenv("PERSIST_DIRECTORY")
-
 GEMINI_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 HUGGING_FACE_KEY = os.getenv("HUGGING_FACE_KEY")
-UPLOAD_FOLDER = os.path.join(os.getcwd(), '/app/uploads')
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     print("Creating folder...")
     os.makedirs(UPLOAD_FOLDER)
@@ -44,11 +47,29 @@ else:
 
 app = Flask(__name__)
 CORS(app)
-collection = None
 os.environ["USER_AGENT"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("rag-harpa.log"),  # Simpan log ke file
+        logging.StreamHandler(sys.stdout)  # Tampilkan di console
+    ]
+)
+@app.before_request
+def start_request_logging():
+    request_id = str(uuid.uuid4())  # Generate unique request ID
+    request.environ["REQUEST_ID"] = request_id
+    logging.info(f"[REQUEST {request_id}] Incoming request: {request.method} {request.path}, Body: {request.get_json(silent=True)}")
+
+@app.after_request
+def end_request_logging(response):
+    request_id = request.environ.get("REQUEST_ID", "UNKNOWN")
+    logging.info(f"[REQUEST {request_id}] Response Status: {response.status_code}, Body: {response.get_json(silent=True)}")
+    return response
 
 session_history: Dict[str, List[Dict[str, str]]] = {}
 embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -80,6 +101,7 @@ def get_gemini_response(query: str, context: List[str],intent, session_id: str, 
     return response.text
 @app.route('/v1/knowledge', methods=['POST'])
 def upload_document():
+    global collection
     try:
         authorization_header = request.headers.get('Authorization')
         if not authorization_header:
@@ -91,7 +113,7 @@ def upload_document():
         result = decode_and_check_exp(bearer_token)
 
         if "error" in result:
-            return jsonify({"error": f"{result["error"]}"}), 401
+            return jsonify({"error": f"{result['error']}"}), 401
 
 
         text = None
@@ -104,10 +126,9 @@ def upload_document():
             doc_name = document.filename
             if not validate_document_format(doc_name):
                 return jsonify({"error": "Invalid document format. Only PDF, PPT, DOCX, and images are supported."}), 400
-
             upload_path = os.path.join(app.config['UPLOAD_FOLDER'], doc_name)
-            text = extract_text_from_file(upload_path)
             document.save(upload_path)
+            text = extract_text_from_file(upload_path)
 
         elif(request.args.get('type')=='url'):
             if not request.json.get('url'):
@@ -121,7 +142,6 @@ def upload_document():
 
             safe_url = f"{domain}{path}"
             doc_name = f"url_content_{safe_url}_{os.urandom(6).hex()}.pdf"
-            # pdf_path = os.path.join("uploads", doc_name)
             pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], doc_name)
 
             all_pages = "\n".join([doc.page_content for doc in documents])
@@ -161,7 +181,7 @@ def chat():
     bearer_token = authorization_header.split(" ")[1]
     result = decode_and_check_exp(bearer_token)
     if "error" in result:
-        return jsonify({"error": f"{result["error"]}"}), 401
+        return jsonify({"error": f"{result['error']}"}), 401
 
 
 
@@ -183,20 +203,91 @@ def chat():
     external_context = []
     try:
         detected_intent = detect_intent(embedding_model,intent_embeddings,query)
-
         if detected_intent == "cuti":
-            url= 'https://hrp02-dev-be-v3.harpa-go.com:8080/apps/accrualPlans/getNetEntitleMobile/?people_uuid=ee140c35-6f32-426d-9c51-7b74d05160aa&effective_date=2025-01-16'
+            request_data = request.get_json(silent=True) or {}
+            people_uuid = request_data.get("people_uuid")
+            if not people_uuid:
+                return jsonify({"error": "people_uuid is required"}), 400
+            referer = request.headers.get('Access-Url', 'https://hrp02-dev-be-v3.harpa-go.com:8080')
+            effective_date = request_data.get("effective_date", date.today().strftime("%Y-%m-%d"))
+            url = f"{referer}/accrualPlans/getNetEntitleMobile/?people_uuid={people_uuid}&effective_date={effective_date}"
             headers={
             "Authorization": f"JWT {bearer_token}",
             "Access-Function": request.headers.get('Access-Function'),
             "Access-Org": request.headers.get('Access-Org'),
-            "Access-Role": request.headers.get('Access-Role')
+            "Access-Role": request.headers.get('Access-Role'),
+            "Connection": "keep-alive"
             }
+            logging.info(f"[REQUEST Endpoint Sisa Cuti] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
             response=load_endpoint(url,headers)
+            logging.info(f"[Response Endpoint Sisa Cuti], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+
             if "error" in response:
-                external_context.append(f"Data gaji kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut.")
+                external_context.append(f"Data cuti kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
             elif response and isinstance(response, dict):
-                external_context.append(f"Data gaji terbaru: {response["net_entitlement"]} {response["satuan"]}")
+                external_context.append(f"Data cuti terbaru tersisa sebanyak: {response['net_entitlement']} {response['satuan']}")
+
+            # Cuti terpakai
+            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
+            url_used_cuti = f"{referer}/chatBot/leave/?people_uuid={people_uuid}"
+            logging.info(f"[REQUEST Endpoint Cuti terpakai] request to: {url_used_cuti}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+            response=load_endpoint(url_used_cuti,headers)
+            logging.info(f"[Response Endpoint Cuti terpakai], response: {response}  with request detail -> url: {url_used_cuti}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+
+            if "error" in response:
+                external_context.append(f"Data jumlah cuti terpakai kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
+            elif response and isinstance(response, dict):
+                external_context.append(f"Data cuti yang telah digunakan tersisa sebanyak: {response['total']} hari. Dengan pembagian yaitu Annual Leave sebanyak {response['details']['Annual Leave']} hari dan Mass Leave sebanyak {response['details']['Mass Leave']} hari")
+
+
+        elif detected_intent== "plafon":
+            request_data = request.get_json(silent=True) or {}
+            people_uuid = request_data.get("people_uuid")
+            if not people_uuid:
+                return jsonify({"error": "people_uuid is required"}), 400
+            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
+            year_of_claim = int(request_data.get("year_of_claim", date.today().year))
+            url = f"{referer}/chatBot/plafonClaim/?people_uuid={people_uuid}&year_of_claim={year_of_claim}"
+            headers={
+            "Authorization": f"JWT {bearer_token}",
+            "Access-Function": request.headers.get('Access-Function'),
+            "Access-Org": request.headers.get('Access-Org'),
+            "Access-Role": request.headers.get('Access-Role'),
+            "Connection": "keep-alive"
+            }
+            logging.info(f"[REQUEST Endpoint Plafon] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+            response=load_endpoint(url,headers)
+            logging.info(f"[Response Endpoint Plafon], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+
+            if "error" in response:
+                external_context.append(f"Data sisa plafon kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
+            elif response and isinstance(response, dict):
+                if "results" in response and "value" in response["results"]:
+                    external_context.append(f"Data sisa plafon terbaru: {response['results']['value']} rupiah")
+                else:
+                    external_context.append(f"Sisa plafon terbaru tidak ditemukan {response} rupiah")
+        elif detected_intent=='approval':
+            request_data = request.get_json(silent=True) or {}
+            people_uuid = request_data.get("people_uuid")
+            if not people_uuid:
+                return jsonify({"error": "people_uuid is required"}), 400
+            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
+            url = f"{referer}/chatBot/aim/?initiator_uuid={people_uuid}"
+            headers={
+            "Authorization": f"JWT {bearer_token}",
+            "Access-Function": request.headers.get('Access-Function'),
+            "Access-Org": request.headers.get('Access-Org'),
+            "Access-Role": request.headers.get('Access-Role'),
+            "Connection": "keep-alive"
+            }
+            logging.info(f"[REQUEST Endpoint Approval] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+            response=load_endpoint(url,headers)
+            logging.info(f"[Response Endpoint Plafon], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+
+            if "error" in response:
+                external_context.append(f"Data jumlah pending approval kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
+            elif response and isinstance(response, dict):
+                external_context.append(f"Data jumlah pending approval kamu ada sebanyak: {response['count']}.")
 
         context_results = collection.query(
             query_texts=[query],
@@ -212,10 +303,9 @@ def chat():
 
         if not all(isinstance(c, str) for c in context):
             return jsonify({"error": "Context is not in the expected format."}), 500
-
-        response = get_gemini_response(query, context,detected_intent, session_id, documentID=document_id)
+        response=''
+        # response = get_gemini_response(query, context,detected_intent, session_id, documentID=document_id)
         chat_history[user_id].append({"query": query, "response": response})
-
 
         references = [{
             "line_number": meta["line_number"],
@@ -258,6 +348,8 @@ def get_chat_history():
 
 @app.route('/v1/knowledge/documents', methods=['GET'])
 def list_documents():
+    global collection
+
     authorization_header = request.headers.get('Authorization')
 
     if not authorization_header:
@@ -311,11 +403,12 @@ def main(collection_name: str = "documents_collection") -> None:
     except Exception as e:
         print(f"Collection '{collection_name}' not found. Creating a new collection.")
         collection = client.create_collection(name=collection_name, embedding_function=embedding_function)
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    # app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+main(collection_name="documents_collection")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load documents into a Chroma collection")
-    # parser.add_argument("--persist_directory", type=str, default="chroma_storage", help="Directory to store the Chroma collection")
     parser.add_argument("--collection_name", type=str, default="documents_collection", help="Name of the Chroma collection")
     args = parser.parse_args()
     main(collection_name=args.collection_name)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8090)))
