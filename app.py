@@ -87,7 +87,7 @@ def get_gemini_response(query: str, context: List[str],intent, session_id: str, 
         similarities = util.cos_sim(scores, doc_scores)        
         ranked_pairs = sorted(zip(context, similarities), key=lambda x: x[1], reverse=True)
         return [doc for doc, _ in ranked_pairs]
-    if(intent=="cuti"):
+    if(intent is not None):
         used_context=context
         prompt = build_combined_prompt(query, used_context, history)
     else:
@@ -198,113 +198,106 @@ def chat():
     if query is None:
         return jsonify({"error": "Query is missing or None."}), 400
 
-
-
     external_context = []
     try:
         detected_intent = detect_intent(embedding_model,intent_embeddings,query)
-        if detected_intent == "cuti":
-            request_data = request.get_json(silent=True) or {}
-            people_uuid = request_data.get("people_uuid")
-            if not people_uuid:
-                return jsonify({"error": "people_uuid is required"}), 400
-            referer = request.headers.get('Access-Url', 'https://hrp02-dev-be-v3.harpa-go.com:8080')
+        headers={
+        "Authorization": f"JWT {bearer_token}",
+        "Access-Function": request.headers.get('Access-Function'),
+        "Access-Org": request.headers.get('Access-Org'),
+        "Access-Role": request.headers.get('Access-Role'),
+        "Connection": "keep-alive"
+        }
+        referer = request.headers.get('Access-Url', 'https://hrp07-dev-be-v3.harpa-go.com:8080')
+        request_data = request.get_json(silent=True) or {}
+        people_uuid = request_data.get("people_uuid")
+        if not people_uuid:
+            return jsonify({"error": "people_uuid is required"}), 400
+
+        if detected_intent == "sisa cuti":
             effective_date = request_data.get("effective_date", date.today().strftime("%Y-%m-%d"))
             url = f"{referer}/accrualPlans/getNetEntitleMobile/?people_uuid={people_uuid}&effective_date={effective_date}"
-            headers={
-            "Authorization": f"JWT {bearer_token}",
-            "Access-Function": request.headers.get('Access-Function'),
-            "Access-Org": request.headers.get('Access-Org'),
-            "Access-Role": request.headers.get('Access-Role'),
-            "Connection": "keep-alive"
-            }
             logging.info(f"[REQUEST Endpoint Sisa Cuti] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
             response=load_endpoint(url,headers)
             logging.info(f"[Response Endpoint Sisa Cuti], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
-
             if "error" in response:
                 external_context.append(f"Data cuti kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
             elif response and isinstance(response, dict):
                 external_context.append(f"Data cuti terbaru tersisa sebanyak: {response['net_entitlement']} {response['satuan']}")
 
-            # Cuti terpakai
-            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
-            url_used_cuti = f"{referer}/chatBot/leave/?people_uuid={people_uuid}"
-            logging.info(f"[REQUEST Endpoint Cuti terpakai] request to: {url_used_cuti}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
-            response=load_endpoint(url_used_cuti,headers)
-            logging.info(f"[Response Endpoint Cuti terpakai], response: {response}  with request detail -> url: {url_used_cuti}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+        elif detected_intent=="cuti terpakai":
+            url = f"{referer}/chatBot/leave/?people_uuid={people_uuid}"
+            logging.info(f"[REQUEST Endpoint Cuti terpakai] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+            response=load_endpoint(url,headers)
+            logging.info(f"[Response Endpoint Cuti terpakai], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
 
             if "error" in response:
                 external_context.append(f"Data jumlah cuti terpakai kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
             elif response and isinstance(response, dict):
-                external_context.append(f"Data cuti yang telah digunakan tersisa sebanyak: {response['total']} hari. Dengan pembagian yaitu Annual Leave sebanyak {response['details']['Annual Leave']} hari dan Mass Leave sebanyak {response['details']['Mass Leave']} hari")
-
-
+                leave_details = " dan ".join([f"{key} sebanyak {value} hari" for key, value in response['details'].items()])
+                external_context.append(f"Data cuti yang telah digunakan tersisa sebanyak: {response['total']} hari. Dengan pembagian yaitu {leave_details}")
+            else:
+                external_context.append(f"Belum ada cuti yang telah digunakan hingga saat ini.")
         elif detected_intent== "plafon":
-            request_data = request.get_json(silent=True) or {}
-            people_uuid = request_data.get("people_uuid")
-            if not people_uuid:
-                return jsonify({"error": "people_uuid is required"}), 400
-            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
             year_of_claim = int(request_data.get("year_of_claim", date.today().year))
             url = f"{referer}/chatBot/plafonClaim/?people_uuid={people_uuid}&year_of_claim={year_of_claim}"
-            headers={
-            "Authorization": f"JWT {bearer_token}",
-            "Access-Function": request.headers.get('Access-Function'),
-            "Access-Org": request.headers.get('Access-Org'),
-            "Access-Role": request.headers.get('Access-Role'),
-            "Connection": "keep-alive"
-            }
             logging.info(f"[REQUEST Endpoint Plafon] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
             response=load_endpoint(url,headers)
             logging.info(f"[Response Endpoint Plafon], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
 
             if "error" in response:
-                external_context.append(f"Data sisa plafon kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
+                external_context.append(f"Data sisa plafon rawat jalan kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
             elif response and isinstance(response, dict):
-                if "results" in response and "value" in response["results"]:
-                    external_context.append(f"Data sisa plafon terbaru: {response['results']['value']} rupiah")
-                else:
-                    external_context.append(f"Sisa plafon terbaru tidak ditemukan {response} rupiah")
+                if "results" in response and isinstance(response['results'], list) and response['results']:
+                    if "value" in response['results'][0]:
+                        external_context.append(f"Sisa plafon rawat jalan terbaru ada sebanyak {response['results'][0]['value']} rupiah")
+                    else:
+                        external_context.append("Sisa plafon rawat jalan terbaru tidak ditemukan dalam response.")
+            else:
+                external_context.append("Sisa plafon rawat jalan terbaru tidak tersedia.")
+
         elif detected_intent=='approval':
-            request_data = request.get_json(silent=True) or {}
-            people_uuid = request_data.get("people_uuid")
-            if not people_uuid:
-                return jsonify({"error": "people_uuid is required"}), 400
-            referer = request.headers.get('Access-Url', 'https://hrp04-dev-be-v3.harpa-go.com:8080')
-            url = f"{referer}/chatBot/aim/?initiator_uuid={people_uuid}"
-            headers={
-            "Authorization": f"JWT {bearer_token}",
-            "Access-Function": request.headers.get('Access-Function'),
-            "Access-Org": request.headers.get('Access-Org'),
-            "Access-Role": request.headers.get('Access-Role'),
-            "Connection": "keep-alive"
-            }
+            url = f"{referer}/chatBot/aim/?initiator_uuid={people_uuid}&showAll=Y"
             logging.info(f"[REQUEST Endpoint Approval] request to: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
             response=load_endpoint(url,headers)
-            logging.info(f"[Response Endpoint Plafon], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
+            logging.info(f"[Response Endpoint Approval], response: {response}  with request detail -> url: {url}, detected intent: {detected_intent} Headers : {headers}. people_uuid: {people_uuid}")
 
             if "error" in response:
-                external_context.append(f"Data jumlah pending approval kamu belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
+                external_context.append(f"Data jumlah pending approval belum tersedia, coba kontak tim HARPA untuk info lebih lanjut, terdapat error : {response}")
             elif response and isinstance(response, dict):
-                external_context.append(f"Data jumlah pending approval kamu ada sebanyak: {response['count']}.")
+                count = response.get("count", 0)
+                if count == 0:
+                    external_context.append("Saat ini tidak ada pending approval.")
+                else:
+                    approval_details = []
+                    for item in response.get("results", []):
+                        approval_type = item.get("type", "Approval Tidak Diketahui")
+                        approval_count = item.get("count", 1)
+                        approval_details.append(f"{approval_type} sebanyak {approval_count}")
+                    approval_text = " dan ".join(approval_details)
+                    external_context.append(f"Data jumlah pending approval ada sebanyak {count}. Dengan pembagian yaitu {approval_text}.")
+            else:
+                    external_context.append(f"Data jumlah pending approval kamu belum ada nih untuk saat ini.")
+        elif detected_intent=='tentang HARPA':
+            document_id='doc_19251d42c572'
 
         context_results = collection.query(
             query_texts=[query],
             n_results=5,
             include=["documents", "metadatas"],
-            where={"document_id": document_id} if document_id else None  
+            where={"document_id": {"$eq": document_id}} if document_id else None
         )
 
         if not context_results["documents"]:
             return jsonify({"error": "No relevant information found in the database."}), 404
         context = [doc for docs in context_results["documents"] for doc in docs] + external_context
         metadata = [meta for metas in context_results["metadatas"] for meta in metas]
+        logging.info(f"context : {context}")
 
         if not all(isinstance(c, str) for c in context):
             return jsonify({"error": "Context is not in the expected format."}), 500
-        response=''
-        # response = get_gemini_response(query, context,detected_intent, session_id, documentID=document_id)
+        # response=''
+        response = get_gemini_response(query, context,detected_intent, session_id, documentID=document_id)
         chat_history[user_id].append({"query": query, "response": response})
 
         references = [{

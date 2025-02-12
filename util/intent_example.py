@@ -1,13 +1,16 @@
 from sentence_transformers import util
 intent_examples = {
-    "cuti": [
+    "sisa cuti": [
         "Saya ingin mengajukan cuti.",
         "Cuti saya masih berapa hari?",
-        "Bagaimana cara mengajukan cuti?",
         "Berapa sisa cuti saya?",
         "Apakah saya bisa mengambil cuti besok?"
-        "Berapa cuti yang sudah saya pakai?",
-        "Berapa ijin yang sudah saya pakai?"
+    ],
+    "cuti terpakai":[
+        "berapa cuti saya yang sudah saya pakai?",
+        "berapa ijin yang sudah saya pakai?",
+        "sudah berapa banyak saya menggunakan jatah cuti saya?",
+        "sudah  berapa kali saya ijin?"
     ],
     "approval": [
         "Berapa pending approval saya?",
@@ -22,6 +25,16 @@ intent_examples = {
         "Berapa batas klaim yang tersisa?",
         "Saya mau cek sisa plafon untuk klaim",
         "Cek limit klaim yang masih tersedia"
+    ],
+    "tentang HARPA":[
+        "apa itu HARPA?",
+        "apa keuntungan dari HARPA?",
+        "dimana kantor HARPA?",
+        "berapa nomor telpon HARPA?",
+        "apa saja fitur utama dari HARPA?",
+        "bagaimana penilaian customer terhadap HARPA?",
+        "siapa Head of IT dari HARPA?",
+        "bagaimana infrastructure aplikasi HARPA?"
     ]
 }
 def detect_intent(intent_model,intent_embeddings,user_query: str):
